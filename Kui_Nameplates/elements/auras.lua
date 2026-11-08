@@ -427,10 +427,10 @@ local function AuraFrame_GetButton(self,spellid)
     return button
 end
 local function AuraFrame_ShouldShowAura(self,spellid,name,duration,caster,can_purge,nps_own,nps_all,index)
-    if not name or not spellid then return end
+    if not name or not spellid or (issecretvalue and issecretvalue(name)) then return end
     name = strlower(name)
 
-    if kui.CLASSIC then
+    if kui.CLASSIC or kui.FOREVER then
         -- show all own auras on classic
         nps_own = true
     end
@@ -889,7 +889,7 @@ function ele:Initialise()
     self:RegisterCallback('PostUpdateAuraFrame')
     self:RegisterCallback('DisplayAura',true)
 
-    if kui.CLASSIC and not kui.CATA then
+    if kui.CLASSIC and not kui.CATA and not kui.FOREVER then
         AuraLib = LibStub('LibClassicDurations',true)
         if not AuraLib then return end
 

@@ -112,7 +112,7 @@ function mod:UNIT_THREAT_LIST_UPDATE(_,f,unit)
     f.state.tank_mode_offtank = nil
 
     local status = UnitThreatSituation('player',unit)
-    if not status or status < 3 then
+    if not status or (issecretvalue and issecretvalue(status)) or status < 3 then
         -- player isn't tanking; get current target
         local tank_unit = unit..'target'
 
@@ -133,7 +133,7 @@ function mod:UNIT_THREAT_LIST_UPDATE(_,f,unit)
 end
 function mod:SpecUpdate()
     if not self.enabled then return end
-    if kui.CLASSIC then
+    if kui.CLASSIC or kui.FOREVER then
         role_enabled = UnitGroupRolesAssigned('player') == 'TANK'
         return 
     end -- XXX no spec data on classic
@@ -182,7 +182,7 @@ function mod:OnEnable()
     self:RegisterMessage('GlowColourChange')
     self:RegisterEvent('GROUP_ROSTER_UPDATE','GroupUpdate')
     self:RegisterEvent('PLAYER_ENTERING_WORLD','SpecUpdate')
-    if not kui.CLASSIC then
+    if not kui.CLASSIC and not kui.FOREVER then
         self:RegisterEvent('PLAYER_SPECIALIZATION_CHANGED','SpecUpdate')
     end
     if kui.CATA then

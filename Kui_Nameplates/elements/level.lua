@@ -16,7 +16,7 @@ function addon.Nameplate.UpdateLevel(f)
     if f.elements.LevelText then
         local l,cl,d = kui.UnitLevel(f.unit,nil,instanced_pvp)
         f.LevelText:SetText(l..cl)
-        f.LevelText:SetTextColor(d.r,d.g,d.b)
+        if d and d.r then f.LevelText:SetTextColor(d.r,d.g,d.b) end
     end
 end
 -- messages ####################################################################

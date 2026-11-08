@@ -7,14 +7,15 @@ function addon.Nameplate.UpdateAbsorb(f)
     f.state.absorbs = UnitGetTotalAbsorbs(f.unit) or 0
 
     if f.elements.AbsorbBar then
-        if f.state.health_max and f.state.absorbs > 0 then
+        local is_secret = issecretvalue and (issecretvalue(f.state.absorbs) or issecretvalue(f.state.health_max))
+        if is_secret or (f.state.health_max and f.state.absorbs and f.state.absorbs > 0) then
             f.AbsorbBar:SetMinMaxValues(0,f.state.health_max)
             f.AbsorbBar:SetValue(f.state.absorbs)
             f.AbsorbBar:Show()
 
             if f.AbsorbBar.spark then
                 -- show spark for over-absorbs
-                if f.state.absorbs > f.state.health_max then
+                if not is_secret and f.state.absorbs > f.state.health_max then
                     f.AbsorbBar.spark:Show()
                 else
                     f.AbsorbBar.spark:Hide()

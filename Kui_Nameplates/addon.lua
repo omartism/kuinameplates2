@@ -205,49 +205,54 @@ local function OnEvent(self,event,...)
 
     -- disable the default class resource bars
     --luacheck:globals NamePlateDriverFrame
-    if NamePlateDriverFrame and not kui.CLASSIC then
+    if NamePlateDriverFrame and not kui.CLASSIC and not kui.FOREVER then
         if not self.USE_BLIZZARD_PERSONAL then
-            NamePlateDriverFrame:SetClassNameplateManaBar(nil)
+            if NamePlateDriverFrame.SetClassNameplateManaBar then
+                NamePlateDriverFrame:SetClassNameplateManaBar(nil)
+            end
             --luacheck:globals ClassNameplateManaBarFrame
-            ClassNameplateManaBarFrame:UnregisterAllEvents()
+            if ClassNameplateManaBarFrame then
+                ClassNameplateManaBarFrame:UnregisterAllEvents()
+            end
         end
         if not self.USE_BLIZZARD_PERSONAL and not self.USE_BLIZZARD_POWERS then
-            NamePlateDriverFrame:SetClassNameplateBar(nil)
-            --luacheck:globals DeathKnightResourceOverlayFrame
-            DeathKnightResourceOverlayFrame:UnregisterAllEvents()
-            DeathKnightResourceOverlayFrame:HookScript("OnShow", DeathKnightResourceOverlayFrame.Hide)
-            --luacheck:globals ClassNameplateBarMageFrame
-            ClassNameplateBarMageFrame:UnregisterAllEvents()
-            ClassNameplateBarMageFrame:HookScript("OnShow", ClassNameplateBarMageFrame.Hide)
-            --luacheck:globals ClassNameplateBarWindwalkerMonkFrame
-            ClassNameplateBarWindwalkerMonkFrame:UnregisterAllEvents()
-            ClassNameplateBarWindwalkerMonkFrame:HookScript("OnShow", ClassNameplateBarWindwalkerMonkFrame.Hide)
-            --luacheck:globals ClassNameplateBarPaladinFrame
-            ClassNameplateBarPaladinFrame:UnregisterAllEvents()
-            ClassNameplateBarPaladinFrame:HookScript("OnShow", ClassNameplateBarPaladinFrame.Hide)
-            --luacheck:globals ClassNameplateBarRogueFrame
-            ClassNameplateBarRogueFrame:UnregisterAllEvents()
-            ClassNameplateBarRogueFrame:HookScript("OnShow", ClassNameplateBarRogueFrame.Hide)
-            --luacheck:globals ClassNameplateBarFeralDruidFrame
-            ClassNameplateBarFeralDruidFrame:UnregisterAllEvents()
-            ClassNameplateBarFeralDruidFrame:HookScript("OnShow", ClassNameplateBarFeralDruidFrame.Hide)
-            --luacheck:globals ClassNameplateBarWarlockFrame
-            ClassNameplateBarWarlockFrame:UnregisterAllEvents()
-            ClassNameplateBarWarlockFrame:HookScript("OnShow", ClassNameplateBarWarlockFrame.Hide)
-            --luacheck:globals ClassNameplateBrewmasterBarFrame
-            ClassNameplateBrewmasterBarFrame:UnregisterAllEvents()
-            ClassNameplateBrewmasterBarFrame:HookScript("OnShow", ClassNameplateBrewmasterBarFrame.Hide)
-            --luacheck:globals ClassNameplateBarDracthyrFrame
-            ClassNameplateBarDracthyrFrame:UnregisterAllEvents()
-            ClassNameplateBarDracthyrFrame:HookScript("OnShow", ClassNameplateBarDracthyrFrame.Hide)
-            --luacheck:globals ClassNameplateEbonMightBarFrame
-            ClassNameplateEbonMightBarFrame:UnregisterAllEvents()
-            ClassNameplateEbonMightBarFrame:HookScript("OnShow", ClassNameplateEbonMightBarFrame.Hide)
+            if NamePlateDriverFrame.SetClassNameplateBar then
+                NamePlateDriverFrame:SetClassNameplateBar(nil)
+            end
+            local frames = {
+                DeathKnightResourceOverlayFrame,
+                ClassNameplateBarMageFrame,
+                ClassNameplateBarWindwalkerMonkFrame,
+                ClassNameplateBarPaladinFrame,
+                ClassNameplateBarRogueFrame,
+                ClassNameplateBarFeralDruidFrame,
+                ClassNameplateBarWarlockFrame,
+                ClassNameplateBrewmasterBarFrame,
+                ClassNameplateBarDracthyrFrame,
+                ClassNameplateEbonMightBarFrame,
+            }
+            for _, f in ipairs(frames) do
+                if f then
+                    f:UnregisterAllEvents()
+                    f:HookScript("OnShow", f.Hide)
+                end
+            end
         end
     end
     -- hide default unit frames
     if NamePlateDriverFrame and NamePlateDriverFrame.AcquireUnitFrame then
         hooksecurefunc(NamePlateDriverFrame,'AcquireUnitFrame',self.NamePlateDriverFrame_AcquireUnitFrame)
+    end
+    if C_NamePlate and C_NamePlate.GetNamePlates then
+        for _, plate in ipairs(C_NamePlate.GetNamePlates()) do
+            if not plate.kui then
+                self:NAME_PLATE_CREATED(plate)
+            end
+            local unit = plate.namePlateUnitToken or (plate.UnitFrame and plate.UnitFrame.unit)
+            if unit then
+                self:NAME_PLATE_UNIT_ADDED(unit)
+            end
+        end
     end
 end
 ------------------------------------------- initialise addon scripts & events --

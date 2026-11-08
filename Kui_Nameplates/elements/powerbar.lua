@@ -6,8 +6,10 @@ function addon.Nameplate.UpdatePower(f)
     f = f.parent
     if f.elements.PowerBar then
         if f.state.power_type then
-            f.PowerBar:SetMinMaxValues(0,UnitPowerMax(f.unit,f.state.power_type))
-            f.PowerBar:SetValue(UnitPower(f.unit,f.state.power_type))
+            local pmax = UnitPowerMax(f.unit,f.state.power_type) or 1
+            f.PowerBar:SetMinMaxValues(0,pmax)
+            local pcur = UnitPower(f.unit,f.state.power_type) or 0
+            f.PowerBar:SetValue(pcur)
         else
             f.PowerBar:SetValue(0)
         end
@@ -20,7 +22,7 @@ function addon.Nameplate.UpdatePowerType(f,on_show)
     local power_index,power_name = UnitPowerType(f.unit)
     local power_max = UnitPowerMax(f.unit,power_index)
 
-    if power_max == 0 then
+    if not (issecretvalue and issecretvalue(power_max)) and (power_max == nil or power_max == 0) then
         power_index = nil
     end
 

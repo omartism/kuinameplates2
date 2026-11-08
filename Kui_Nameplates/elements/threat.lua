@@ -27,6 +27,7 @@ function ele:UNIT_THREAT_LIST_UPDATE(_,f,unit)
     if not unit or unit == 'player' or UnitIsUnit('player',unit) then return end
 
     local status = UnitThreatSituation('player',unit)
+    if issecretvalue and issecretvalue(status) then status = nil end
     local threat_state = status and (
         (status == 3 and 1) or -- target
         (status < 3 and status > 0 and 2) or -- transition

@@ -10,6 +10,20 @@
 local folder = ...
 local kui = LibStub('Kui-1.0')
 local knp = KuiNameplates
+local function SafeSetCVar(cvar, value)
+    if value == nil then return end
+    if type(value) == 'boolean' then
+        value = value and '1' or '0'
+    else
+        value = tostring(value)
+    end
+    if C_CVar and C_CVar.SetCVar then
+        pcall(C_CVar.SetCVar, cvar, value)
+    elseif SetCVar then
+        pcall(SetCVar, cvar, value)
+    end
+end
+local SetCVar = SafeSetCVar
 local core = KuiNameplatesCore --luacheck:globals KuiNameplatesCore
 local config -- set when layout is loaded
 
@@ -180,7 +194,8 @@ function command_func.config(...)
         InterfaceOptionsFrame_OpenToCategory(opt.name)
         InterfaceOptionsFrame_OpenToCategory(opt.name)
     else
-        Settings.OpenToCategory(opt.name)
+        local catID = opt.category and (opt.category.GetID and opt.category:GetID() or opt.category.ID) or opt.name
+        Settings.OpenToCategory(catID)
     end
 end
 function command_func.debug(arg,...)

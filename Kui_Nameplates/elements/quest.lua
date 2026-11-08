@@ -47,6 +47,17 @@ local function TooltipScan_ProgressText(text)
     end
 end
 local function GetQuestTextForUnit(unit)
+    if C_TooltipInfo and C_TooltipInfo.GetUnit then
+        local data = C_TooltipInfo.GetUnit(unit)
+        if data and data.lines then
+            for i, line in ipairs(data.lines) do
+                if i >= 3 and line.leftText then
+                    local r = TooltipScan_ProgressText(line.leftText)
+                    if r then return r end
+                end
+            end
+        end
+    end
     return TooltipWrapper(unit,TooltipScan_ProgressText)
 end
 local function UpdateQuestState(frame,dispatch)

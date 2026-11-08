@@ -41,6 +41,20 @@
     - bugginess when more than max icons are created.
 ]]
 local addon = KuiNameplates
+local function SafeSetCVar(cvar, value)
+    if value == nil then return end
+    if type(value) == 'boolean' then
+        value = value and '1' or '0'
+    else
+        value = tostring(value)
+    end
+    if C_CVar and C_CVar.SetCVar then
+        pcall(C_CVar.SetCVar, cvar, value)
+    elseif SetCVar then
+        pcall(SetCVar, cvar, value)
+    end
+end
+local SetCVar = SafeSetCVar
 local kui = LibStub('Kui-1.0')
 local mod = addon:NewPlugin('BossMods',nil,nil,false)
 
@@ -314,11 +328,11 @@ do
         plugin_ct:PLAYER_REGEN_ENABLED()
 
         -- reset clickthrough
-        if disable_enemy_clickthrough then
+        if disable_enemy_clickthrough and C_NamePlate.SetNamePlateEnemyClickThrough then
             C_NamePlate.SetNamePlateEnemyClickThrough(false)
             disable_enemy_clickthrough = nil
         end
-        if disable_friendly_clickthrough then
+        if disable_friendly_clickthrough and C_NamePlate.SetNamePlateFriendlyClickThrough then
             C_NamePlate.SetNamePlateFriendlyClickThrough(false)
             disable_friendly_clickthrough = nil
         end
@@ -372,17 +386,23 @@ do
                 if CLICKTHROUGH then
                     if hostile then
                         if  not prev_show_enemies and
+                            C_NamePlate.GetNamePlateEnemyClickThrough and
                             not C_NamePlate.GetNamePlateEnemyClickThrough()
                         then
                             disable_enemy_clickthrough = true
-                            C_NamePlate.SetNamePlateEnemyClickThrough(true)
+                            if C_NamePlate.SetNamePlateEnemyClickThrough then
+                                C_NamePlate.SetNamePlateEnemyClickThrough(true)
+                            end
                         end
                     else
                         if  not prev_show_friends and
+                            C_NamePlate.GetNamePlateFriendlyClickThrough and
                             not C_NamePlate.GetNamePlateFriendlyClickThrough()
                         then
                             disable_friendly_clickthrough = true
-                            C_NamePlate.SetNamePlateFriendlyClickThrough(true)
+                            if C_NamePlate.SetNamePlateFriendlyClickThrough then
+                                C_NamePlate.SetNamePlateFriendlyClickThrough(true)
+                            end
                         end
                     end
                 end

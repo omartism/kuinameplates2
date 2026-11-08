@@ -5,3 +5,5 @@ dev
 .luacheckrc
 .release
 .vscode
+
+AGENTS.md

@@ -1,4 +1,5 @@
-## Interface: 100207, 110000, 110002
+## Interface: 16001, 100207, 110000, 110002
+## Interface-Forever: 16001
 ## Interface-Classic: 11501
 ## Interface-BCC: 20501
 ## Interface-Wrath: 30402

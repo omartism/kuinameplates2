@@ -44,7 +44,7 @@ function core:Create(f)
 end
 function core:Show(f)
     -- state helpers
-    f.state.friend = f.state.reaction > 4 or UnitIsFriend('player',f.unit)
+    f.state.friend = (f.state.reaction and not (issecretvalue and issecretvalue(f.state.reaction)) and f.state.reaction > 4) or UnitIsFriend('player',f.unit)
     f.state.class = select(2,UnitClass(f.unit))
     f.state.player = UnitIsPlayer(f.unit)
 
@@ -94,7 +94,7 @@ function core:HealthUpdate(f)
 end
 function core:HealthColourChange(f)
     -- faction/reaction change
-    f.state.friend = f.state.reaction > 4 or UnitIsFriend('player',f.unit)
+    f.state.friend = (f.state.reaction and not (issecretvalue and issecretvalue(f.state.reaction)) and f.state.reaction > 4) or UnitIsFriend('player',f.unit)
     self:NameOnlyCombatUpdate(f)
 end
 function core:PowerTypeUpdate(f)
@@ -231,6 +231,7 @@ do
         else
             local category, _ = Settings.RegisterCanvasLayoutCategory(opt, opt.name)
             category.ID = opt.name
+            opt.category = category
             Settings.RegisterAddOnCategory(category)
         end
     end
@@ -271,11 +272,11 @@ do
         return UnitAffectingCombat(f.unit) and 1
     end, 23 }
     fade_rules.fade_neutral_enemy = { function(f)
-        return f.state.reaction == 4 and
+        return f.state.reaction and not (issecretvalue and issecretvalue(f.state.reaction)) and f.state.reaction == 4 and
                UnitCanAttack('player',f.unit) and -1
     end, 25 }
     fade_rules.fade_friendly_npc = { function(f)
-        if  f.state.reaction >= 4 and
+        if  f.state.reaction and not (issecretvalue and issecretvalue(f.state.reaction)) and f.state.reaction >= 4 and
             not UnitIsPlayer(f.unit) and
             -- (^ this can't use the layout's state helper)
             not UnitCanAttack('player',f.unit)

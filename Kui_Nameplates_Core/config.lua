@@ -25,6 +25,49 @@ local font_support = locale ~= 'zhCN' and locale ~= 'zhTW' and locale ~= 'koKR'
 local DEFAULT_FONT = font_support and 'Roboto Condensed Bold' or
                      LSM:GetDefault(LSM.MediaType.FONT)
 local DEFAULT_BAR = 'Kui status bar'
+local function SafeSetCVar(cvar, value)
+    if value == nil then return end
+    if type(value) == 'boolean' then
+        value = value and '1' or '0'
+    else
+        value = tostring(value)
+    end
+    if C_CVar and C_CVar.SetCVar then
+        pcall(C_CVar.SetCVar, cvar, value)
+    elseif SetCVar then
+        pcall(SetCVar, cvar, value)
+    end
+end
+local SetCVar = SafeSetCVar
+local GetCVar = C_CVar and C_CVar.GetCVar or GetCVar
+local function SafeGetCVar(cvar)
+    local val
+    if C_CVar and C_CVar.GetCVarDefault then
+        val = C_CVar.GetCVarDefault(cvar)
+    elseif GetCVarDefault then
+        val = GetCVarDefault(cvar)
+    end
+    if val == nil then
+        if C_CVar and C_CVar.GetCVar then
+            val = C_CVar.GetCVar(cvar)
+        elseif GetCVar then
+            val = GetCVar(cvar)
+        end
+    end
+    return val
+end
+local function SafeGetCVarBool(cvar, default)
+    local val = SafeGetCVar(cvar)
+    if val == nil then return default end
+    return val == "1" or val == 1 or val == true
+end
+local function SafeGetCVarNumber(cvar, default)
+    local val = SafeGetCVar(cvar)
+    if (issecretvalue and issecretvalue(val)) or val == nil then return default end
+    local num = tonumber(val)
+    return num or default
+end
+
 -- default configuration #######################################################
 local default_config = {
     bar_texture = DEFAULT_BAR,
@@ -258,20 +301,20 @@ local default_config = {
     bossmod_clickthrough = false,
 
     cvar_enable = false,
-    cvar_show_friendly_npcs = GetCVarDefault('nameplateShowFriendlyNPCs')=="1",
-    cvar_name_only = GetCVarDefault('nameplateShowOnlyNames')=="1",
-    cvar_personal_show_always = GetCVarDefault('nameplatePersonalShowAlways')=="1",
-    cvar_personal_show_combat = GetCVarDefault('nameplatePersonalShowInCombat')=="1",
-    cvar_personal_show_target = GetCVarDefault('nameplatePersonalShowWithTarget')=="1",
-    cvar_clamp_top = tonumber(GetCVarDefault('nameplateOtherTopInset')),
-    cvar_clamp_bottom = tonumber(GetCVarDefault('nameplateOtherBottomInset')),
-    cvar_self_clamp_top = tonumber(GetCVarDefault('nameplateSelfTopInset')),
-    cvar_self_clamp_bottom = tonumber(GetCVarDefault('nameplateSelfBottomInset')),
-    cvar_overlap_v = tonumber(GetCVarDefault('nameplateOverlapV')),
+    cvar_show_friendly_npcs = SafeGetCVarBool('nameplateShowFriendlyNPCs', false),
+    cvar_name_only = SafeGetCVarBool('nameplateShowOnlyNames', false),
+    cvar_personal_show_always = SafeGetCVarBool('nameplatePersonalShowAlways', false),
+    cvar_personal_show_combat = SafeGetCVarBool('nameplatePersonalShowInCombat', false),
+    cvar_personal_show_target = SafeGetCVarBool('nameplatePersonalShowWithTarget', false),
+    cvar_clamp_top = SafeGetCVarNumber('nameplateOtherTopInset', 0.08),
+    cvar_clamp_bottom = SafeGetCVarNumber('nameplateOtherBottomInset', 0.1),
+    cvar_self_clamp_top = SafeGetCVarNumber('nameplateSelfTopInset', 0.5),
+    cvar_self_clamp_bottom = SafeGetCVarNumber('nameplateSelfBottomInset', 0.2),
+    cvar_overlap_v = SafeGetCVarNumber('nameplateOverlapV', 1.1),
     cvar_disable_scale = true,
     cvar_disable_alpha = true,
     cvar_self_alpha = 1,
-    cvar_occluded_mult = tonumber(GetCVarDefault('nameplateOccludedAlphaMult')),
+    cvar_occluded_mult = SafeGetCVarNumber('nameplateOccludedAlphaMult', 0.4),
 
     -- XXX legacy aura variables; kept for transition
     -- transition logic: p=px*py;x=ox;y=oy.
@@ -314,7 +357,7 @@ function core:Scale(v)
 end
 -- local functions #############################################################
 local function UpdateClickboxSize()
-    if kui.CLASSIC then return end -- XXX functions exist, but break display
+    if kui.CLASSIC and not kui.FOREVER then return end -- XXX functions exist, but break display
     local x_pad = core:Scale(core.profile.frame_padding_x)
     local y_pad = core:Scale(core.profile.frame_padding_y)
 
@@ -323,21 +366,25 @@ local function UpdateClickboxSize()
 
     if C_NamePlate.SetNamePlateOtherSize then
         C_NamePlate.SetNamePlateOtherSize(o_width,o_height)
-    else
+    elseif C_NamePlate.SetNamePlateFriendlySize then
         C_NamePlate.SetNamePlateFriendlySize(o_width,o_height)
-        C_NamePlate.SetNamePlateEnemySize(o_width,o_height)
+        if C_NamePlate.SetNamePlateEnemySize then
+            C_NamePlate.SetNamePlateEnemySize(o_width,o_height)
+        end
     end
 
-    if addon.USE_BLIZZARD_PERSONAL then
-        -- obey width, use static height
-        C_NamePlate.SetNamePlateSelfSize(
-            core.profile.frame_width_personal - x_pad,
-            45
-        )
-    else
-        local p_width = (core:Scale(core.profile.frame_width_personal) * addon.uiscale) + x_pad
-        local p_height = (core:Scale(core.profile.frame_height_personal) * addon.uiscale) + y_pad
-        C_NamePlate.SetNamePlateSelfSize(p_width,p_height)
+    if C_NamePlate.SetNamePlateSelfSize then
+        if addon.USE_BLIZZARD_PERSONAL then
+            -- obey width, use static height
+            C_NamePlate.SetNamePlateSelfSize(
+                core.profile.frame_width_personal - x_pad,
+                45
+            )
+        else
+            local p_width = (core:Scale(core.profile.frame_width_personal) * addon.uiscale) + x_pad
+            local p_height = (core:Scale(core.profile.frame_height_personal) * addon.uiscale) + y_pad
+            C_NamePlate.SetNamePlateSelfSize(p_width,p_height)
+        end
     end
 end
 local function QueueClickboxUpdate()
@@ -708,9 +755,15 @@ function configChanged.ignore_uiscale(v)
 end
 
 local function ClickthroughUpdate()
-    C_NamePlate.SetNamePlateSelfClickThrough(core.profile.clickthrough_self)
-    C_NamePlate.SetNamePlateFriendlyClickThrough(core.profile.clickthrough_friend)
-    C_NamePlate.SetNamePlateEnemyClickThrough(core.profile.clickthrough_enemy)
+    if C_NamePlate.SetNamePlateSelfClickThrough then
+        C_NamePlate.SetNamePlateSelfClickThrough(core.profile.clickthrough_self)
+    end
+    if C_NamePlate.SetNamePlateFriendlyClickThrough then
+        C_NamePlate.SetNamePlateFriendlyClickThrough(core.profile.clickthrough_friend)
+    end
+    if C_NamePlate.SetNamePlateEnemyClickThrough then
+        C_NamePlate.SetNamePlateEnemyClickThrough(core.profile.clickthrough_enemy)
+    end
 end
 local function QueueClickthroughUpdate()
     cc:QueueFunction(ClickthroughUpdate)
@@ -774,11 +827,11 @@ local function UpdateCVars()
     then
         -- reset to defaults if the current values match ours,
         -- since i haven't provided a way to set them directly.
-        SetCVar('nameplateMinScale',GetCVarDefault('nameplateMinScale'))
-        SetCVar('nameplateMaxScale',GetCVarDefault('nameplateMaxScale'))
-        SetCVar('nameplateLargerScale',GetCVarDefault('nameplateLargerScale'))
-        SetCVar('nameplateSelectedScale',GetCVarDefault('nameplateSelectedScale'))
-        SetCVar('nameplateSelfScale',GetCVarDefault('nameplateSelfScale'))
+        SetCVar('nameplateMinScale',SafeGetCVar('nameplateMinScale') or 1)
+        SetCVar('nameplateMaxScale',SafeGetCVar('nameplateMaxScale') or 1)
+        SetCVar('nameplateLargerScale',SafeGetCVar('nameplateLargerScale') or 1)
+        SetCVar('nameplateSelectedScale',SafeGetCVar('nameplateSelectedScale') or 1)
+        SetCVar('nameplateSelfScale',SafeGetCVar('nameplateSelfScale') or 1)
     end
 
     if core.profile.cvar_disable_alpha then
@@ -790,9 +843,9 @@ local function UpdateCVars()
            GetCVar('nameplateSelectedAlpha') == '1'
     then
         -- reset to defaults
-        SetCVar('nameplateMinAlpha',GetCVarDefault('nameplateMinAlpha'))
-        SetCVar('nameplateMaxAlpha',GetCVarDefault('nameplateMaxAlpha'))
-        SetCVar('nameplateSelectedAlpha',GetCVarDefault('nameplateSelectedAlpha'))
+        SetCVar('nameplateMinAlpha',SafeGetCVar('nameplateMinAlpha') or 1)
+        SetCVar('nameplateMaxAlpha',SafeGetCVar('nameplateMaxAlpha') or 1)
+        SetCVar('nameplateSelectedAlpha',SafeGetCVar('nameplateSelectedAlpha') or 1)
     end
 end
 local function configChangedCVar()

@@ -11,21 +11,26 @@ local GetFramerate = GetFramerate
 -- cutaway #####################################################################
 do
     local function SetValueCutaway(self,value)
-        if not self:IsVisible() then
-            -- passthrough initial calls
+        if not self:IsVisible() or
+           (issecretvalue and (issecretvalue(value) or issecretvalue(self:GetValue()) or issecretvalue(select(2,self:GetMinMaxValues()))))
+        then
+            -- passthrough initial calls or secret values
             self:orig_anim_SetValue(value)
             return
         end
 
-        if value < self:GetValue() then
+        local cur = self:GetValue()
+        local maxVal = select(2,self:GetMinMaxValues())
+
+        if cur and maxVal and maxVal > 0 and value < cur then
             if not kui.frameIsFading(self.KuiFader) then
                 self.KuiFader:SetPoint(
                     'RIGHT', self, 'LEFT',
-                    (self:GetValue() / select(2,self:GetMinMaxValues())) * self:GetWidth(), 0
+                    (cur / maxVal) * self:GetWidth(), 0
                 )
 
                 -- store original rightmost value
-                self.KuiFader.right = self:GetValue()
+                self.KuiFader.right = cur
 
                 kui.frameFade(self.KuiFader, {
                     mode = 'OUT',
@@ -34,7 +39,7 @@ do
             end
         end
 
-        if self.KuiFader.right and value > self.KuiFader.right then
+        if self.KuiFader.right and not (issecretvalue and (issecretvalue(value) or issecretvalue(self.KuiFader.right))) and value > self.KuiFader.right then
             -- stop animation if new value overlaps old end point
             kui.frameFadeRemoveFrame(self.KuiFader)
             self.KuiFader:SetAlpha(0)
@@ -110,7 +115,8 @@ do
     end
 
     local function SetValueSmooth(self,value)
-        if not self:IsVisible() then
+        if not self:IsVisible() or (issecretvalue and (issecretvalue(value) or issecretvalue(self:GetValue()))) then
+            if smoothing[self] then ClearBar(self) end
             self:orig_anim_SetValue(value)
             return
         end
@@ -126,13 +132,18 @@ do
         local limit = 30/GetFramerate()
         for bar,value in pairs(smoothing) do
             local cur = bar:GetValue()
-            local new = cur + min((value-cur)/3, max(value-cur, limit))
-
-            if cur == value or abs(new-value) < .005 then
+            if issecretvalue and (issecretvalue(value) or issecretvalue(cur)) then
                 bar:orig_anim_SetValue(value)
                 ClearBar(bar)
             else
-                bar:orig_anim_SetValue(new)
+                local new = cur + min((value-cur)/3, max(value-cur, limit))
+
+                if cur == value or abs(new-value) < .005 then
+                    bar:orig_anim_SetValue(value)
+                    ClearBar(bar)
+                else
+                    bar:orig_anim_SetValue(new)
+                end
             end
         end
     end

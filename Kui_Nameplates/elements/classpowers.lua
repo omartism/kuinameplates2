@@ -804,7 +804,7 @@ function ele:OnEnable()
 
     self:UpdateConfig()
 
-    if not kui.CLASSIC then
+    if not kui.CLASSIC and not kui.FOREVER then
         -- This event is sometimes spammed upon entering/leaving instanced PVP.
         -- It's always called at least once, and during this first call,
         -- UnitPowerMax returns 0 for some reason. (#125)
@@ -861,7 +861,7 @@ function ele:Initialise()
     self:RegisterCallback('PostPositionFrame')
 
     -- initialise powers
-    if kui.CLASSIC and not kui.CATA then
+    if (kui.CLASSIC or kui.FOREVER) and not kui.CATA then
         -- power types by class/spec
         powers = {
             DRUID = Enum.PowerType.ComboPoints,

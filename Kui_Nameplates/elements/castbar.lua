@@ -59,14 +59,24 @@ function addon.Nameplate.CastBarShow(f)
     f = f.parent
 
     if f.elements.CastBar then
-        f.CastBar:SetMinMaxValues(0,f.cast_state.end_time-f.cast_state.start_time)
+        local dur = (f.cast_state.end_time and f.cast_state.start_time and
+            not (issecretvalue and (issecretvalue(f.cast_state.end_time) or issecretvalue(f.cast_state.start_time))) and
+            (f.cast_state.end_time - f.cast_state.start_time)) or nil
 
-        if f.cast_state.channel then
-            f.CastBar:SetValue((f.cast_state.end_time-f.cast_state.start_time)-(GetTime()-f.cast_state.start_time))
-            f.CastBarUpdateFrame:SetScript('OnUpdate',CastBarUpdate_Channel)
+        if dur and dur > 0 then
+            f.CastBar:SetMinMaxValues(0, dur)
+
+            if f.cast_state.channel then
+                f.CastBar:SetValue(dur - (GetTime() - f.cast_state.start_time))
+                f.CastBarUpdateFrame:SetScript('OnUpdate', CastBarUpdate_Channel)
+            else
+                f.CastBar:SetValue(GetTime() - f.cast_state.start_time)
+                f.CastBarUpdateFrame:SetScript('OnUpdate', CastBarUpdate_Cast)
+            end
         else
-            f.CastBar:SetValue(GetTime()-f.cast_state.start_time)
-            f.CastBarUpdateFrame:SetScript('OnUpdate',CastBarUpdate_Cast)
+            f.CastBar:SetMinMaxValues(0, 1)
+            f.CastBar:SetValue(1)
+            f.CastBarUpdateFrame:SetScript('OnUpdate', nil)
         end
 
         f.CastBarUpdateFrame.duration = nil
@@ -112,8 +122,8 @@ function ele:Show(f)
 
     if UnitChannelInfo(f.unit) then
         local _,_,_,_,_,_,_,_,_,numStages = UnitChannelInfo(f.unit)
-        if numStages and numStages > 0 then
-            if kui.CLASSIC then return end
+        if numStages and not (issecretvalue and issecretvalue(numStages)) and numStages > 0 then
+            if kui.CLASSIC and not kui.FOREVER then return end
             self:CastStart('UNIT_SPELLCAST_EMPOWER_START',f,f.unit)
         else
             self:CastStart('UNIT_SPELLCAST_CHANNEL_START',f,f.unit)
@@ -127,6 +137,7 @@ end
 -- events ######################################################################
 function ele:CastStart(event,f,unit)
     local name,text,texture,startTime,endTime,guid,notInterruptible
+    local numStages
     if event == 'UNIT_SPELLCAST_CHANNEL_START' or event == 'UNIT_SPELLCAST_EMPOWER_START' then
         name,text,texture,startTime,endTime,_,notInterruptible,_,numStages = UnitChannelInfo(unit)
     else
@@ -138,18 +149,30 @@ function ele:CastStart(event,f,unit)
     f.cast_state.name          = text or name
     f.cast_state.icon          = texture
     f.cast_state.guid          = guid
-    f.cast_state.interruptible = not (notInterruptible == true)
-    -- (we check not == true because this var doesn't exist on classic)
-    f.cast_state.num_stages    = numStages == true
+    if (issecretvalue and issecretvalue(notInterruptible)) or notInterruptible == nil then
+        f.cast_state.interruptible = true
+    else
+        f.cast_state.interruptible = not notInterruptible
+    end
+    f.cast_state.num_stages    = numStages and not (issecretvalue and issecretvalue(numStages)) and numStages or nil
     f.cast_state.empowered     = event == 'UNIT_SPELLCAST_EMPOWER_START'
     f.cast_state.channel       = event == 'UNIT_SPELLCAST_CHANNEL_START'
-    f.cast_state.start_time    = startTime / 1000
-    f.cast_state.end_time      = endTime / 1000
+
+    if not (issecretvalue and (issecretvalue(startTime) or issecretvalue(endTime))) and startTime and endTime then
+        f.cast_state.start_time = startTime / 1000
+        f.cast_state.end_time   = endTime / 1000
+    else
+        f.cast_state.start_time = nil
+        f.cast_state.end_time   = nil
+    end
 
     f.handler:CastBarShow()
 end
 function ele:CastStop(event,f,_,guid)
-    if not f.state.casting or guid ~= f.cast_state.guid then return end
+    if not f.state.casting then return end
+    if not (issecretvalue and (issecretvalue(guid) or issecretvalue(f.cast_state.guid))) then
+        if guid and f.cast_state.guid and guid ~= f.cast_state.guid then return end
+    end
     f.handler:CastBarHide(
         ((event == 'UNIT_SPELLCAST_INTERRUPTED' or event == 'UNIT_SPELLCAST_FAILED') and ele.HIDE_INTERRUPT) or
         (event == 'UNIT_SPELLCAST_SUCCEEDED' and ele.HIDE_SUCCESS) or
@@ -173,8 +196,7 @@ function ele:CastUpdate(_,f,unit)
         _,_,_,startTime,endTime = UnitCastingInfo(unit)
     end
 
-    if not startTime or not endTime then
-        f.handler:CastBarHide(ele.HIDE_STOP)
+    if not startTime or not endTime or (issecretvalue and (issecretvalue(startTime) or issecretvalue(endTime))) then
         return
     end
 
@@ -221,7 +243,7 @@ local function LibCC_ChannelStop(...)
 end
 -- register ####################################################################
 function ele:Initialise()
-    if kui.CLASSIC and not kui.CATA then
+    if kui.CLASSIC and not kui.CATA and not kui.FOREVER then
         LibCC = LibStub('LibClassicCasterino',true)
         if not LibCC then return end
 
@@ -245,7 +267,7 @@ function ele:OnDisable()
     end
 end
 function ele:OnEnable()
-    if not kui.CLASSIC or kui.CATA then
+    if not kui.CLASSIC or kui.CATA or kui.FOREVER then
         self:RegisterUnitEvent('UNIT_SPELLCAST_START','CastStart')
         self:RegisterUnitEvent('UNIT_SPELLCAST_STOP','CastStop')
         self:RegisterUnitEvent('UNIT_SPELLCAST_DELAYED','CastUpdate')

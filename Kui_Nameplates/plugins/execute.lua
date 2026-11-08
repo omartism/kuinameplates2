@@ -103,7 +103,7 @@ function mod:SetExecuteRange(to)
         self:UnregisterEvent('PLAYER_FLAGS_CHANGED')
         self:UnregisterEvent('PLAYER_EQUIPMENT_CHANGED')
         execute_range = to
-    elseif not kui.CLASSIC then
+    elseif not kui.CLASSIC and not kui.FOREVER then
         -- force immediate auto-detect
         self:RegisterEvent('PLAYER_SPECIALIZATION_CHANGED')
         self:RegisterEvent('PLAYER_FLAGS_CHANGED','PLAYER_SPECIALIZATION_CHANGED')
@@ -118,9 +118,9 @@ end
 function mod:HealthColourChange(f,caller)
     if caller and caller == self then return end
 
-    if not UnitIsTapDenied(f.unit) and
-       f.state.health_cur > 0 and
-       f.state.health_per <= execute_range
+    if not (issecretvalue and (issecretvalue(f.state.health_cur) or issecretvalue(f.state.health_per))) and not UnitIsTapDenied(f.unit) and
+       f.state.health_cur and f.state.health_cur > 0 and
+       f.state.health_per and f.state.health_per <= execute_range
     then
         if CanOverwriteHealthColor(f) then
             f.state.execute_range_coloured = true

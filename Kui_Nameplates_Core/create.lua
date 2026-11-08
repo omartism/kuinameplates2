@@ -62,6 +62,10 @@ local CreateStatusBar
 do
     local function FadeSpark(bar)
         local val,max = bar:GetValue(),select(2,bar:GetMinMaxValues())
+        if not val or not max or (issecretvalue and (issecretvalue(val) or issecretvalue(max))) then
+            if bar.spark then bar.spark:Hide() end
+            return
+        end
         local show_val = (max / 100) * 80
 
         if val <= 0 or val >= max then
@@ -489,7 +493,7 @@ do
     local function UpdatePowerBar(f,on_show)
         if  f.state.personal and
             f.state.power_type
-            and UnitPowerMax(f.unit,f.state.power_type) > 0
+            and ((issecretvalue and issecretvalue(UnitPowerMax(f.unit,f.state.power_type))) or (UnitPowerMax(f.unit,f.state.power_type) or 0) > 0)
         then
             f.handler:EnableElement('PowerBar')
         else
@@ -605,16 +609,24 @@ do
 
     local function GetClassColour(f)
         -- return adjusted class colour
+        if not f.state.class and f.unit then
+            f.state.class = select(2,UnitClass(f.unit))
+        end
         if not f.state.class then return end
         if not CLASS_COLOURS then CLASS_COLOURS = {} end
         if not CLASS_COLOURS[f.state.class] then
-            if NAME_COLOUR_BRIGHTEN_CLASS then
-                CLASS_COLOURS[f.state.class] = { kui.Brighten(NAME_COLOUR_BRIGHTEN_CLASS,kui.GetClassColour(f.state.class,2)) }
-            else
-                CLASS_COLOURS[f.state.class] = { kui.GetClassColour(f.state.class,2) }
+            local r,g,b = kui.GetClassColour(f.state.class,2)
+            if r then
+                if NAME_COLOUR_BRIGHTEN_CLASS then
+                    CLASS_COLOURS[f.state.class] = { kui.Brighten(NAME_COLOUR_BRIGHTEN_CLASS,r,g,b) }
+                else
+                    CLASS_COLOURS[f.state.class] = { r,g,b }
+                end
             end
         end
-        return unpack(CLASS_COLOURS[f.state.class])
+        if CLASS_COLOURS[f.state.class] then
+            return unpack(CLASS_COLOURS[f.state.class])
+        end
     end
     local function SetNameTextColour(f)
         -- override colour based on config
@@ -630,39 +642,66 @@ do
             if f.state.friend then
                 if CLASS_COLOUR_FRIENDLY_NAMES then
                     -- use adjusted class colour
-                    f.NameText:SetTextColor(GetClassColour(f))
+                    local cr,cg,cb = GetClassColour(f)
+                    if cr then
+                        f.NameText:SetTextColor(cr,cg,cb)
+                    elseif NAME_COLOUR_PLAYER_FRIENDLY then
+                        f.NameText:SetTextColor(unpack(NAME_COLOUR_PLAYER_FRIENDLY))
+                    else
+                        f.NameText:SetTextColor(1,1,1)
+                    end
                 elseif NAME_COLOUR_WHITE_IN_BAR_MODE and not f.IN_NAMEONLY then
                     -- white in bar mode
                     return
-                else
+                elseif NAME_COLOUR_PLAYER_FRIENDLY then
                     -- use configured friendly player colour
                     f.NameText:SetTextColor(unpack(NAME_COLOUR_PLAYER_FRIENDLY))
+                else
+                    f.NameText:SetTextColor(1,1,1)
                 end
             elseif CLASS_COLOUR_ENEMY_NAMES then
-                f.NameText:SetTextColor(GetClassColour(f))
+                local cr,cg,cb = GetClassColour(f)
+                if cr then
+                    f.NameText:SetTextColor(cr,cg,cb)
+                elseif NAME_COLOUR_PLAYER_HOSTILE then
+                    f.NameText:SetTextColor(unpack(NAME_COLOUR_PLAYER_HOSTILE))
+                else
+                    f.NameText:SetTextColor(1,1,1)
+                end
             elseif NAME_COLOUR_WHITE_IN_BAR_MODE and not f.IN_NAMEONLY then
                 return
-            else
+            elseif NAME_COLOUR_PLAYER_HOSTILE then
                 f.NameText:SetTextColor(unpack(NAME_COLOUR_PLAYER_HOSTILE))
+            else
+                f.NameText:SetTextColor(1,1,1)
             end
         elseif NAME_COLOUR_WHITE_IN_BAR_MODE and not f.IN_NAMEONLY then
             return
         else
             -- NPCs; reaction colour
-            if f.state.reaction > 4 then
+            if f.state.reaction and not (issecretvalue and issecretvalue(f.state.reaction)) and f.state.reaction > 4 then
                 -- friendly
-                f.NameText:SetTextColor(unpack(NAME_COLOUR_NPC_FRIENDLY))
-            elseif f.state.reaction == 4 then
+                if NAME_COLOUR_NPC_FRIENDLY then
+                    f.NameText:SetTextColor(unpack(NAME_COLOUR_NPC_FRIENDLY))
+                end
+            elseif f.state.reaction and not (issecretvalue and issecretvalue(f.state.reaction)) and f.state.reaction == 4 then
                 -- neutral
-                f.NameText:SetTextColor(unpack(NAME_COLOUR_NPC_NEUTRAL))
+                if NAME_COLOUR_NPC_NEUTRAL then
+                    f.NameText:SetTextColor(unpack(NAME_COLOUR_NPC_NEUTRAL))
+                end
             else
                 -- hostile
-                f.NameText:SetTextColor(unpack(NAME_COLOUR_NPC_HOSTILE))
+                if NAME_COLOUR_NPC_HOSTILE then
+                    f.NameText:SetTextColor(unpack(NAME_COLOUR_NPC_HOSTILE))
+                end
             end
         end
 
-        f.GuildText:SetTextColor(kui.Brighten(.8,f.NameText:GetTextColor()))
-        f.GuildText:SetAlpha(.8)
+        local tr,tg,tb = f.NameText:GetTextColor()
+        if tr and tg and tb then
+            f.GuildText:SetTextColor(kui.Brighten(.8,tr,tg,tb))
+            f.GuildText:SetAlpha(.8)
+        end
     end
 
     local function UpdateNameText(f)
@@ -748,6 +787,7 @@ end
 -- health text #################################################################
 do
     local function HealthDisplay_Percent(s)
+        if not s.health_per or (issecretvalue and issecretvalue(s.health_per)) then return '' end
         if s.health_per < 1 then
             return format('%.1f',s.health_per)..HEALTH_TEXT_PERCENT_SYMBOL
         else
@@ -756,12 +796,27 @@ do
     end
     local health_display_funcs = {
         function() return '' end,
-        function(s) return kui.num(s.health_cur) end,
-        function(s) return kui.num(s.health_max) end,
+        function(s) return kui.num(s.health_cur) or '' end,
+        function(s) return kui.num(s.health_max) or '' end,
         HealthDisplay_Percent,
-        function(s) return '-'..kui.num(s.health_deficit) end,
-        function(s) return kui.num(s.health_cur)..'  '..HealthDisplay_Percent(s) end,
-        function(s) return kui.num(s.health_cur)..'  -'..kui.num(s.health_deficit) end,
+        function(s)
+            local d = kui.num(s.health_deficit)
+            return d and ('-'..d) or ''
+        end,
+        function(s)
+            local c = kui.num(s.health_cur)
+            local p = HealthDisplay_Percent(s)
+            return (c and p ~= '' and (c..'  '..p)) or c or p or ''
+        end,
+        function(s)
+            local c = kui.num(s.health_cur)
+            local d = kui.num(s.health_deficit)
+            if c and d then
+                return c..'  -'..d
+            else
+                return c or (d and ('-'..d)) or ''
+            end
+        end,
     }
     local function GetHealthDisplay(f,key)
         return type(key) == 'number' and
@@ -778,13 +833,13 @@ do
             local disp
 
             if f.state.friend then
-                if f.state.health_cur ~= f.state.health_max then
+                if not (issecretvalue and (issecretvalue(f.state.health_cur) or issecretvalue(f.state.health_max))) and f.state.health_cur ~= f.state.health_max then
                     disp = GetHealthDisplay(f,HEALTH_TEXT_FRIEND_DMG)
                 else
                     disp = GetHealthDisplay(f,HEALTH_TEXT_FRIEND_MAX)
                 end
             else
-                if f.state.health_cur ~= f.state.health_max then
+                if not (issecretvalue and (issecretvalue(f.state.health_cur) or issecretvalue(f.state.health_max))) and f.state.health_cur ~= f.state.health_max then
                     disp = GetHealthDisplay(f,HEALTH_TEXT_HOSTILE_DMG)
                 else
                     disp = GetHealthDisplay(f,HEALTH_TEXT_HOSTILE_MAX)
@@ -2197,7 +2252,7 @@ do
 
         local text
         if NAMEONLY_HEALTH_COLOUR then
-            if f.state.health_cur and f.state.health_cur > 0 and
+            if not (issecretvalue and (issecretvalue(f.state.name) or issecretvalue(f.state.health_cur) or issecretvalue(f.state.health_max))) and f.state.health_cur and f.state.health_cur > 0 and
                f.state.health_max and f.state.health_max > 0
             then
                 local health_len =
@@ -2236,7 +2291,7 @@ do
         -- disable on target
         if not NAMEONLY_TARGET and f.state.target then return end
 
-        if not f.state.attackable and f.state.reaction >= 4 then
+        if not f.state.attackable and f.state.reaction and not (issecretvalue and issecretvalue(f.state.reaction)) and f.state.reaction >= 4 then
             -- friendly;
             -- disable on friends in combat
             if not NAMEONLY_COMBAT_FRIENDLY and f.state.combat then
@@ -2254,11 +2309,11 @@ do
                 end
             end
             -- disable on damaged friends
-            if not NAMEONLY_DAMAGED_FRIENDS and f.state.health_deficit > 0 then
+            if not NAMEONLY_DAMAGED_FRIENDS and not (issecretvalue and issecretvalue(f.state.health_deficit)) and f.state.health_deficit and f.state.health_deficit > 0 then
                 return
             end
         else
-            if f.state.reaction == 4 then
+            if f.state.reaction and not (issecretvalue and issecretvalue(f.state.reaction)) and f.state.reaction == 4 then
                 -- neutral;
                 -- disable on neutral
                 if not NAMEONLY_ON_NEUTRAL then
@@ -2284,7 +2339,7 @@ do
             end
             -- neutral & hostile;
             -- disable on damaged enemies
-            if not NAMEONLY_DAMAGED_ENEMIES and f.state.health_deficit > 0 then
+            if not NAMEONLY_DAMAGED_ENEMIES and not (issecretvalue and issecretvalue(f.state.health_deficit)) and f.state.health_deficit and f.state.health_deficit > 0 then
                 return
             end
             if f.state.combat then

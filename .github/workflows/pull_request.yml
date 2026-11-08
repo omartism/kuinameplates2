@@ -17,34 +17,13 @@ jobs:
           args: "--no-default-config --no-color -qo '011'"
           annotate: warning
 
-      - name: Create Retail Package
+      - name: Create WoW Forever Package
         uses: BigWigsMods/packager@v2
         with:
-          args: -d -z -g retail -m .pkgmeta.yml
+          args: -d -z -g forever -m .pkgmeta.yml
 
       - uses: actions/upload-artifact@v7
         with:
-          name: KNP-PR${{ github.event.number }}
+          name: KNP-PR${{ github.event.number }}-forever
           archive: false
           path: .release/
-
-      - name: Create Classic Package
-        uses: BigWigsMods/packager@v2
-        with:
-          args: -d -z -g cata -m .pkgmeta-classic.yml
-
-      - uses: actions/upload-artifact@v3
-        with:
-          name: KNP-PR${{ github.event.number }}-classic
-          path: .release/
-
-      - name: Create Classic Era Package
-        uses: BigWigsMods/packager@v2
-        with:
-          args: -d -z -g classic -m .pkgmeta-classic.yml
-
-      - uses: actions/upload-artifact@v6
-        with:
-          name: KNP-PR${{ github.event.number }}-classic-era
-          path: .release/
-

@@ -80,9 +80,13 @@ function addon.Nameplate.UpdateHealth(f,show)
         f.state.health_max = UnitHealthMax(f.unit)
     end
 
-    f.state.health_deficit = f.state.health_max - f.state.health_cur
+    if issecretvalue and (issecretvalue(f.state.health_cur) or issecretvalue(f.state.health_max)) then
+        f.state.health_deficit = 0
+    else
+        f.state.health_deficit = (f.state.health_max or 0) - (f.state.health_cur or 0)
+    end
     f.state.health_per =
-        f.state.health_cur > 0 and f.state.health_max > 0 and
+        not (issecretvalue and (issecretvalue(f.state.health_cur) or issecretvalue(f.state.health_max))) and f.state.health_cur and f.state.health_max and f.state.health_cur > 0 and f.state.health_max > 0 and
         (f.state.health_cur / f.state.health_max) * 100 or
         0
 
@@ -114,7 +118,7 @@ function ele:OnEnable()
     self:RegisterUnitEvent(kui.UNIT_HEALTH,'UNIT_HEALTH')
 end
 function ele:Initialise()
-    if kui.CLASSIC and RealMobHealth and RealMobHealth.GetUnitHealth then
+    if kui.CLASSIC and not kui.FOREVER and RealMobHealth and RealMobHealth.GetUnitHealth then
         RMH = RealMobHealth
     end
     self.colours = {

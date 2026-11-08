@@ -6,16 +6,19 @@ if not kui then
     return
 end
 
---luacheck:globals WOW_PROJECT_ID WOW_PROJECT_CLASSIC WOW_PROJECT_MISTS_CLASSIC
+--luacheck:globals WOW_PROJECT_ID WOW_PROJECT_CLASSIC WOW_PROJECT_MISTS_CLASSIC WOW_PROJECT_CAMELOT
+local tocversion = select(4,GetBuildInfo())
+local FOREVER = WOW_PROJECT_ID == 18 or (WOW_PROJECT_CAMELOT ~= nil and WOW_PROJECT_ID == WOW_PROJECT_CAMELOT) or (tocversion >= 16000 and tocversion < 20000)
 local CLASSIC = WOW_PROJECT_ID == WOW_PROJECT_CLASSIC
 local MISTS = WOW_PROJECT_ID == WOW_PROJECT_MISTS_CLASSIC
+kui.FOREVER = FOREVER
 kui.CLASSIC = CLASSIC or MISTS
 kui.CATA = MISTS
 
 -- XXX 8X -> 90 compatibility helper
-local SHADOWLANDS = select(4,GetBuildInfo()) >= 90000
+local SHADOWLANDS = tocversion >= 90000 or FOREVER
 kui.SHADOWLANDS = SHADOWLANDS
-kui.UNIT_HEALTH = SHADOWLANDS and 'UNIT_HEALTH' or 'UNIT_HEALTH_FREQUENT'
+kui.UNIT_HEALTH = (SHADOWLANDS or FOREVER) and 'UNIT_HEALTH' or 'UNIT_HEALTH_FREQUENT'
 
 -- media # XXX LEGACY #########################################################
 local media = "Interface\\AddOns\\Kui_Media\\"
@@ -199,24 +202,35 @@ end
 kui.GetClassColour = function(class, str)
     if not class then
         class = select(2, UnitClass('player'))
-    elseif not RAID_CLASS_COLORS[class] then
+    elseif not (RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]) then
         -- assume class is a unit
         class = select(2, UnitClass(class))
     end
 
-    if CUSTOM_CLASS_COLORS then
-        class = CUSTOM_CLASS_COLORS[class]
-    else
-        class = RAID_CLASS_COLORS[class]
+    local ctbl
+    if CUSTOM_CLASS_COLORS and CUSTOM_CLASS_COLORS[class] then
+        ctbl = CUSTOM_CLASS_COLORS[class]
+    elseif RAID_CLASS_COLORS and RAID_CLASS_COLORS[class] then
+        ctbl = RAID_CLASS_COLORS[class]
+    end
+
+    if not ctbl then
+        if str == 2 then
+            return 1, 1, 1
+        elseif str then
+            return "ffffff"
+        else
+            return { r = 1, g = 1, b = 1 }
+        end
     end
 
     if str == 2 then
-        return class.r,class.g,class.b
+        return ctbl.r,ctbl.g,ctbl.b
     elseif str then
-        return string.format("%02x%02x%02x", class.r*255, class.g*255, class.b*255)
+        return string.format("%02x%02x%02x", ctbl.r*255, ctbl.g*255, ctbl.b*255)
     else
         -- XXX this is a direct reference
-        return class
+        return ctbl
     end
 end
 kui.SetTextureToClass = function(texture,class,with_border,ymod)
@@ -266,10 +280,14 @@ kui.GetUnitColour = function(unit, str)
 end
 kui.UnitLevel = function(unit, long, real)
     local level
-    if kui.CLASSIC then
+    if kui.CLASSIC and not kui.FOREVER then
         level = UnitLevel(unit) or 0
     else
-        level = real and UnitLevel(unit) or UnitEffectiveLevel(unit)
+        level = real and UnitLevel(unit) or (UnitEffectiveLevel and UnitEffectiveLevel(unit)) or UnitLevel(unit) or 0
+    end
+
+    if issecretvalue and issecretvalue(level) then
+        return '??', '', { r = 1, g = 1, b = 1 }
     end
 
     local classification = UnitClassification(unit)
@@ -335,7 +353,7 @@ kui.CreateFontString = function(parent, args)
 end
 -- generic helpers #############################################################
 kui.num = function(num) -- TODO needs locale
-    if not num then return end
+    if not num or (issecretvalue and issecretvalue(num)) then return end
     if num < THOUSAND then
         return floor(num)
     elseif num >= TRILLION then
@@ -349,6 +367,7 @@ kui.num = function(num) -- TODO needs locale
     end
 end
 kui.FormatTime = function(s)
+    if not s or (issecretvalue and issecretvalue(s)) then return '', 0 end
     if s > 86400 then
         -- days
         return ceil(s/86400) .. 'd', s%86400
